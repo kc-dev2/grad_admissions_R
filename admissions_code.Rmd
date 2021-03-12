@@ -4,6 +4,8 @@ author: "Kyle Choi"
 date: "3/12/2021"
 output: html_document
 ---
+***All files related to this project can be found at https://github.com/kc-dev2/grad_admissions_R***
+
 ## Purpose
 
 The purpose of this project is to practice exploring and creating models on sample data. More specifically, I have selected graduate admissions data listed on [Kaggle](https://www.kaggle.com/mohansacharya/graduate-admissions). 
@@ -20,10 +22,21 @@ library(tidyverse)
 adm <- read_csv("../data/admissions.csv")
 ```
 
+For data "cleaning", I will check to ensure that there are no missing data. Additionally, any columns that need be renamed or have types changed will be fixed.
 ```{r adm}
-summary(adm)
+sapply(adm, function(x) sum(is.na(x))) #counting total missing values in each column
+str(adm); summary(adm) #checking basic info on data
+adm <- rename(adm, GRE = "GRE Score", TOEFL = "TOEFL Score", U_Ranking = "University Rating", adm_chance = "Chance of Admit") #renaming columns
+names(adm)
+adm$Research <- as.factor(adm$Research) #changing 'Research' column from numerical to factor
+str(adm$Research)
 ```
-
+afdfd this is returning error
+```{r adm}
+plot(adm) #check relationships between predictors and admission chance percentage
+sub_adm <- adm[, !names(adm) %in% c("Research")] #remove "Research" column to allow for correlation matrix
+corrplot::corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
+```
 ## Including Plots
 
 You can also embed plots, for example:
