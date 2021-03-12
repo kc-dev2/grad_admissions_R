@@ -1,0 +1,35 @@
+---
+title: "Graduate Admissions Prediction"
+author: "Kyle Choi"
+date: "3/12/2021"
+output: html_document
+---
+## Purpose
+
+The purpose of this project is to practice exploring and creating models on sample data. More specifically, I have selected graduate admissions data listed on [Kaggle](https://www.kaggle.com/mohansacharya/graduate-admissions). 
+
+While exploring the data, I will ask questions such as "what predictor seems to be most effective in predicting admission probability" and also plot graphs to help communicate/visualize these results. Afterwards, I will create a few linear models to predict admission probabilities and validate these models.
+
+### Exploration
+
+To begin, let us import the data along with necessary libraries:
+
+```{r message=FALSE, results='hide'}
+library(tidyverse)
+
+adm <- read_csv("../data/admissions.csv")
+```
+
+```{r adm}
+summary(adm)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
