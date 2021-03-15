@@ -18,31 +18,48 @@ To begin, let us import the data along with necessary libraries:
 
 ```{r message=FALSE, results='hide'}
 library(tidyverse)
+library(ggplot2)
+library(corrplot)
 
 adm <- read_csv("../data/admissions.csv")
 ```
 
 For data "cleaning", I will check to ensure that there are no missing data. Additionally, any columns that need be renamed or have types changed will be fixed.
-```{r adm}
+```{r}
 sapply(adm, function(x) sum(is.na(x))) #counting total missing values in each column
 str(adm); summary(adm) #checking basic info on data
 adm <- rename(adm, GRE = "GRE Score", TOEFL = "TOEFL Score", U_Ranking = "University Rating", adm_chance = "Chance of Admit") #renaming columns
+
 names(adm)
 adm$Research <- as.factor(adm$Research) #changing 'Research' column from numerical to factor
+
 str(adm$Research)
 ```
-afdfd this is returning error
-```{r adm}
-plot(adm) #check relationships between predictors and admission chance percentage
-sub_adm <- adm[, !names(adm) %in% c("Research")] #remove "Research" column to allow for correlation matrix
-corrplot::corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
-```
-## Including Plots
 
-You can also embed plots, for example:
+Let's check potential relationships between predictors and outcome variables. Instead of displaying the correlation plots using plot(), I use the corrplot() function provided by the "corrplot" package to create a visual correlation matrix. Since "Research" column is a factor column, we create a subset of data excluding it to allow for creation of the correlation matrix.
+```{r}
+sub_adm <- adm[, !names(adm) %in% c("Research")] #remove "Research" column
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+As displayed in the bottom row (where admission chance is the y-axis for all correlations) we can see that, apart from "Serial No" which is just an ID column, the predictors generally have a strong correlation with admission chance percentages. In particular, a person's Letter of Recommendation (LOR) score has the weakest correlation with admission chances (R=0.65) while his/her undergraduate GPA (CGPA) has the strongest correlation (R=0.88). 
+
+## Steps to take next
+
+1. Create full model (lm)
+2. Feature selection model using regularization (lm)
+https://towardsdatascience.com/feature-selection-using-regularisation-a3678b71e499
+https://uc-r.github.io/regularized_regression
+3. Create full model (neural network)
+https://www.geeksforgeeks.org/how-neural-networks-are-used-for-regression-in-r-programming/
+https://datascienceplus.com/fitting-neural-network-in-r/
+4?. Feature selection model using regularization (neural network)
+5. Cross validation using k fold to test overall performance of models create in steps 1-4.
+https://www.geeksforgeeks.org/cross-validation-in-r-programming/
+https://www.statology.org/k-fold-cross-validation-in-r/
+6. Select best performing model as prediction model.
+
+Feature importance: https://machinelearningmastery.com/feature-selection-with-the-caret-r-package/
+
+We want to create models that are simpler to avoid overfitting and to also be more cost/time efficient when creating predictions. We can also remove predictors that have collinearity and thus are redundant.
