@@ -45,6 +45,25 @@ corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
 
 As displayed in the bottom row (where admission chance is the y-axis for all correlations) we can see that, apart from "Serial No" which is just an ID column, the predictors generally have a strong correlation with admission chance percentages. In particular, a person's Letter of Recommendation (LOR) score has the weakest correlation with admission chances (R=0.65) while his/her undergraduate GPA (CGPA) has the strongest correlation (R=0.88). 
 
+### Modeling
+
+Now, I will go into creating prediction models for our data. Since all variables apart from ID seem to have some correlation with admission chance, I'll first create a linear model that includes all the variables. Then, I'll create another linear model using both ridge and lasso regularization to allow for feature reduction/selection. Finally, I'll create a neural network as part of a more modern ML approach. K-Fold Cross validation (with k=10) will be used to quantify the performance of each model.
+
+Before doing any model creation, let's exclude the "Serial No." column from our dataset:
+
+```{r}
+adm_mod <- adm[, !names(adm) %in% c("Serial No.")]
+```
+
+Then, let's define the number of folds to be used:
+```{r}
+training <- trainControl(method="cv", number=10)
+```
+
+
+#### 1. Full Model
+We create linear models using the lm() function.
+
 ## Steps to take next
 
 1. Create full model (lm)
