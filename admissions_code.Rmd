@@ -20,6 +20,7 @@ To begin, let us import the data along with necessary libraries:
 library(tidyverse)
 library(ggplot2)
 library(corrplot)
+library(caret)
 
 adm <- read_csv("../data/admissions.csv")
 ```
@@ -64,9 +65,22 @@ training <- trainControl(method="cv", number=10)
 #### 1. Full Model
 We create linear models using the lm() function.
 
+```{r}
+set.seed(22) # set seed for reproducible results
+full_lm <- train(adm_chance ~ ., data=adm_mod, method="lm", trControl=training)
+print(full_lm)
+```
+
+This model gives a decent result, with the predictors being able to explain 82% of the variance in the data ($R^{2}$) and having an average error of ~4% ($MAE$).
+
+#### 2. Regularized Model
+For regularized models, there are two steps that I take. First, I find the $\lambda$ that optimizes the model, and then test the full model, which now includes the $\lambda$ term, with cross validation. Note that to determine the optimal $\lambda$, another cross validation is required to test out performance of the models against the set of $\lambda$ values.
+
 ## Steps to take next
 
 1. Create full model (lm)
+~~https://www.geeksforgeeks.org/cross-validation-in-r-programming/~~
+https://www.journaldev.com/46754/k-fold-cross-validation-in-r
 2. Feature selection model using regularization (lm)
 https://towardsdatascience.com/feature-selection-using-regularisation-a3678b71e499
 https://uc-r.github.io/regularized_regression
