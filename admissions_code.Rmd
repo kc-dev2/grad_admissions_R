@@ -21,6 +21,8 @@ library(tidyverse)
 library(ggplot2)
 library(corrplot)
 library(caret)
+library(glmnet)
+library(neuralnet)
 
 adm <- read_csv("../data/admissions.csv")
 ```
@@ -39,6 +41,7 @@ str(adm$Research)
 
 Let's check potential relationships between predictors and outcome variables. Instead of displaying the correlation plots using plot(), I use the corrplot() function provided by the "corrplot" package to create a visual correlation matrix. Since "Research" column is a factor column, we create a subset of data excluding it to allow for creation of the correlation matrix.
 ```{r}
+plot(adm)
 sub_adm <- adm[, !names(adm) %in% c("Research")] #remove "Research" column
 
 corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
@@ -56,25 +59,103 @@ Before doing any model creation, let's exclude the "Serial No." column from our 
 adm_mod <- adm[, !names(adm) %in% c("Serial No.")]
 ```
 
-Then, let's define the number of folds to be used:
-```{r}
-training <- trainControl(method="cv", number=10)
-```
+To make comparison of different models as equal as possible, I decided it would be best to have all the models trained and tested on the same datasets. As will be shown in the code below, the training and testing subsets are created during each iteration of the for-loop and all the models are run within the same iteration. 
 
-
-#### 1. Full Model
-We create linear models using the lm() function.
+Before creating and testing the models, I do some data standardization and formatting since regularization and neural networks run better with standardized data.
 
 ```{r}
-set.seed(22) # set seed for reproducible results
-full_lm <- train(adm_chance ~ ., data=adm_mod, method="lm", trControl=training)
-print(full_lm)
+norm_data <- sapply(adm_mod[,-8], function(x) if(is.numeric(x)){scale(x)} else x)
+norm_data <- as_tibble(norm_data)
+norm_data$adm_chance <- adm_mod$adm_chance
+norm_data$Research <- as.factor(norm_data$Research)
 ```
 
-This model gives a decent result, with the predictors being able to explain 82% of the variance in the data ($R^{2}$) and having an average error of ~4% ($MAE$).
+Note that the only non-numeric column 'Research' was not standardized and left as a factor column. To be completely honest, I'm not exactly sure how much this effects the model results. My research suggests that there is not much literature on techniques to properly address binary/categorical predictors in more technical regression models such as regularization and neural networks.
 
-#### 2. Regularized Model
-For regularized models, there are two steps that I take. First, I find the $\lambda$ that optimizes the model, and then test the full model, which now includes the $\lambda$ term, with cross validation. Note that to determine the optimal $\lambda$, another cross validation is required to test out performance of the models against the set of $\lambda$ values.
+The final step before running the cross validation for-loop is to find optimal $\lambda$ values for ridge and lasso regularization. To do so, I run the cv.glmnet() function on the the data with 10 folds and find the $\lambda$ that minimizes the average error. 
+
+```{r}
+X <- model.matrix(adm_chance ~ ., data=norm_data)[, -1]
+y <- norm_data$adm_chance
+
+lm_ridge <- cv.glmnet(x=X,y=y,alpha=0,standardize=FALSE)
+opt_lam_r <- lm_ridge$lambda.min
+
+lm_lasso <- cv.glmnet(x=X,y=y,alpha=1,standardize=FALSE)
+opt_lam_l <- lm_lasso$lambda.min
+```
+
+Now that the setup is complete, I move onto running the 10-fold cross validation for all the models. Because the correlation plots suggested that the predictors share a linear relationship with the output "adm_chance", the four models that are run are all linear models. In order, the models are 
+
+1. full model (no regularization)
+2. ridge regression model 
+3. lasso regression model
+4. neural network model
+
+```{r}
+folds <- createFolds(adm$`Serial No.`, k=10)
+res <- matrix(0, 10, 3)
+for(i in 1:10) {
+  s <- folds[[i]]
+  train <- norm_data[-s, ]
+  trainY <- train$adm_chance
+  test <- norm_data[s, ]
+  testY <- test$adm_chance
+  
+  #full linear
+  model1 <- lm(adm_chance ~., data = train)
+  pred1 <- predict(model1, test)
+  err1 <- sum(abs(pred1 - testY))/length(testY) #M.A.E.
+  
+  #regularization setup
+  trainX <- model.matrix(adm_chance ~ ., data=train)[, -1]
+  testX <- model.matrix(adm_chance ~ ., data=test)[, -1]
+  
+  #ridge
+  model2 <- glmnet(x=trainX,y=trainY,alpha=0,lambda=opt_lam_r)
+  pred2 <- predict(model2, testX)
+  err2 <- sum(abs(pred2 - testY))/length(testY)
+  
+  #lasso
+  model3 <- glmnet(x=trainX,y=trainY,alpha=1,lambda=opt_lam_l)
+  pred3 <- predict(model3, testX)
+  err3 <- sum(abs(pred3 - testY))/length(testY)
+  
+  #neural network
+  # maxs <- apply(train, 2, max) 
+  # mins <- apply(train, 2, min)
+  # scaled <- as.data.frame(scale(train, center = mins, 
+  #                               scale = maxs - mins))
+  
+  # mydata <- sapply(train, function(x) if(is.numeric(x)){
+  #   scale(x)
+  # } else x)
+  # 
+  # nn <- neuralnet(adm_chance ~ GRE + TOEFL + U_Ranking + SOP + LOR + CGPA + Research, data = mydata, hidden = c(4,3), linear.output = TRUE, stepmax=1e7)
+  # 
+  # pr.nn <- compute(nn, testX)
+  
+  res[i,] = c(err1,err2,err3)
+}
+
+colMeans(res)
+```
+
+The results show that all 3 models performed almost exactly the same. This makes sense when looking at the $/lambda$ values that were calculated earlier, as both values are very close to 0, which means that the coefficients are barely being penalized and thus the regularized models are very similar to the full, non-regularized model. 
+
+<!-- #### 1. Full Model -->
+<!-- We create linear models using the lm() function. -->
+
+<!-- ```{r} -->
+<!-- set.seed(22) # set seed for reproducible results -->
+<!-- full_lm <- train(adm_chance ~ ., data=adm_mod, method="lm", trControl=training) -->
+<!-- print(full_lm) -->
+<!-- ``` -->
+
+<!-- This model gives a decent result, with the predictors being able to explain 82% of the variance in the data ($R^{2}$) and having an average error of ~4% ($MAE$). -->
+
+<!-- #### 2. Regularized Model -->
+<!-- For regularized models, there are two steps that I take. First, I find the $\lambda$ that optimizes the model, and then test the full model, which now includes the $\lambda$ term, with cross validation. Note that to determine the optimal $\lambda$, another cross validation is required to test out performance of the models against the set of $\lambda$ values. -->
 
 ## Steps to take next
 

@@ -21,29 +21,37 @@ corrplot(cor(sub_adm), type = "lower", addCoef.col = "black")
 #modeling
 set.seed(22) #for reproducible results
 adm_mod <- adm[, !names(adm) %in% c("Serial No.")] #removing id column
-training <- trainControl(method="cv", number=10)
+# training <- trainControl(method="cv", number=10)
 
-full_lm <- train(adm_chance ~ ., data=adm_mod, method="lm", trControl=training)
-print(full_lm)
-
-#regularized model
-X <- model.matrix(adm_chance ~ ., data=adm_mod)[, -1]
-y <- adm_mod$adm_chance
-#glmnet automatically performs standardization
-lm_ridge <- cv.glmnet(x=X,y=y,alpha=0)
-opt_lam_r <- lm_ridge$lambda.min
-
-lm_lasso <- cv.glmnet(x=X,y=y,alpha=1)
-opt_lam_l <- lm_lasso$lambda.min
+# full_lm <- train(adm_chance ~ ., data=adm_mod, method="lm", trControl=training)
+# print(full_lm)
 
 # trying to do everything at once
+norm_data <- sapply(adm_mod[,-8], function(x) if(is.numeric(x)){
+  scale(x) #normalize numeric data first
+} else x)
+norm_data <- as_tibble(norm_data)
+norm_data$adm_chance <- adm_mod$adm_chance #add independent variable column
+norm_data$Research <- as.factor(norm_data$Research) #transform Research column back into factor column
+
+#regularized model
+X <- model.matrix(adm_chance ~ ., data=norm_data)[, -1]
+y <- norm_data$adm_chance
+#opt out of default standardization
+lm_ridge <- cv.glmnet(x=X,y=y,alpha=0,standardize=FALSE)
+opt_lam_r <- lm_ridge$lambda.min
+
+lm_lasso <- cv.glmnet(x=X,y=y,alpha=1,standardize=FALSE)
+opt_lam_l <- lm_lasso$lambda.min
+
+# 10 fold cross validation
 folds <- createFolds(adm$`Serial No.`, k=10)
 res <- matrix(0, 10, 3)
 for(i in 1:10) {
   s <- folds[[i]]
-  train <- adm_mod[-s, ]
+  train <- norm_data[-s, ]
   trainY <- train$adm_chance
-  test <- adm_mod[s, ]
+  test <- norm_data[s, ]
   testY <- test$adm_chance
   
   #full linear
@@ -66,21 +74,23 @@ for(i in 1:10) {
   err3 <- sum(abs(pred3 - testY))/length(testY)
   
   #neural network
-  maxs <- apply(train, 2, max) 
-  mins <- apply(train, 2, min)
-  scaled <- as.data.frame(scale(train, center = mins, 
-                                scale = maxs - mins))
+  # maxs <- apply(train, 2, max) 
+  # mins <- apply(train, 2, min)
+  # scaled <- as.data.frame(scale(train, center = mins, 
+  #                               scale = maxs - mins))
   
-  mydata <- sapply(train, function(x) if(is.numeric(x)){
-    scale(x)
-  } else x)
-  
-  nn <- neuralnet(adm_chance ~ GRE + TOEFL + U_Ranking + SOP + LOR + CGPA + Research, data = mydata, hidden = c(4,3), linear.output = TRUE, stepmax=1e7)
-  
-  pr.nn <- compute(nn, testX)
+  # mydata <- sapply(train, function(x) if(is.numeric(x)){
+  #   scale(x)
+  # } else x)
+  # 
+  # nn <- neuralnet(adm_chance ~ GRE + TOEFL + U_Ranking + SOP + LOR + CGPA + Research, data = mydata, hidden = c(4,3), linear.output = TRUE, stepmax=1e7)
+  # 
+  # pr.nn <- compute(nn, testX)
   
   res[i,] = c(err1,err2,err3)
 }
+
+
 
 colMeans(res)
 mean(unlist(results))
